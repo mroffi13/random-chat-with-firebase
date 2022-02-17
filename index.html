@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+   <head>
+      <meta charset="UTF-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Chat App</title>
+      <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+      <style>
+         body{margin-top:20px;}
+
+         .chat-online {
+            color: #34ce57
+         }
+
+         .chat-offline {
+            color: #e4606d
+         }
+
+         .chat-messages {
+            display: flex;
+            flex-direction: column;
+            height: 450px;
+            overflow-y: scroll
+         }
+
+         .chat-message-left,
+         .chat-message-right {
+            display: flex;
+            flex-shrink: 0
+         }
+
+         .chat-message-left {
+            margin-right: auto
+         }
+
+         .chat-message-right {
+            flex-direction: row-reverse;
+            margin-left: auto
+         }
+         .py-3 {
+            padding-top: 1rem!important;
+            padding-bottom: 1rem!important;
+         }
+         .px-4 {
+            padding-right: 1.5rem!important;
+            padding-left: 1.5rem!important;
+         }
+         .flex-grow-0 {
+            flex-grow: 0!important;
+         }
+         .border-top {
+            border-top: 1px solid #dee2e6!important;
+         }
+      </style>
+   </head>
+   <body>
+      <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+      <script type="module">
+         // Import the functions you need from the SDKs you need
+         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.6/firebase-app.js";
+         import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.6.6/firebase-analytics.js";
+         import { getDatabase, ref, set, get, child, push, onChildAdded } from "https://www.gstatic.com/firebasejs/9.6.6/firebase-database.js";
+         // TODO: Add SDKs for Firebase products that you want to use
+         // https://firebase.google.com/docs/web/setup#available-libraries
+      
+         // Your web app's Firebase configuration
+         // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+         const firebaseConfig = {
+            apiKey: "AIzaSyCTQxfK_v0w9Rnvufk_xzvnLbzjvjiI5Yc",
+            authDomain: "dev-airlock-302403.firebaseapp.com",
+            databaseURL: "https://dev-airlock-302403-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "dev-airlock-302403",
+            storageBucket: "dev-airlock-302403.appspot.com",
+            messagingSenderId: "261847540179",
+            appId: "1:261847540179:web:1395e91e2b57159e2e4f26",
+            measurementId: "G-PXL2Z8DRZL"
+         };
+      
+         // Initialize Firebase
+         const app = initializeApp(firebaseConfig);
+         const analytics = getAnalytics(app);
+         const db = getDatabase();
+         var name = prompt('Masukan Nama ..');
+         var create_room = true;
+         var room_id = makeid(10);
+
+         $(document).ready(function(){
+
+            $('#formMessage').on('submit', function()
+            {
+               getRoomId()
+               $('#kirimPesan').removeClass('btn-success').addClass('btn-primary').html('Send')
+               $('#textMessage').removeAttr('readonly')
+               return false;
+            })
+         })
+
+         function getRoomId()
+         {
+            const dbRef = ref(getDatabase());
+            var room = null;
+            get(child(dbRef, `rooms`)).then((snapshot) => {
+               if (snapshot.exists()) {
+                  $.each(snapshot.val(), function(index, value)
+                  {
+                     if(Object.keys(value).length < 2)
+                        room = index
+                  })
+
+                  if(room !== null && room !== room_id && create_room)
+                  {
+                     createRoom(room, name)
+                     sendMessage(room)
+                     room_id = room
+                     getMessages()
+                     create_room = false;
+                  }
+                  else if(create_room) {
+                     createRoom(room_id, name)
+                     sendMessage(room_id)
+                     getMessages()
+                     create_room = false;
+                  }
+                  else
+                     sendMessage(room_id)
+               } else if(create_room) {
+                  createRoom(room_id, name)
+                  sendMessage(room_id)
+                  getMessages()
+                  create_room = false;
+               }
+               else
+                  sendMessage(room_id)
+               return room;
+            }).catch((error) => {
+               console.error(error);
+            });
+         }
+
+         function getMessages()
+         {
+            const messageRef = ref(db, 'messages/'+room_id)
+            onChildAdded(messageRef, (data) => {
+               addMessageElement(data.val().sender, data.val().message);
+            });
+         }
+
+         function addMessageElement(sender, message)
+         {
+            if(sender == name)
+            {
+               var cloned_el = $('.el-chat-me').clone(true);
+               $(cloned_el).removeClass('el-chat-me d-none')
+            }
+            else
+            {
+               var cloned_el = $('.el-chat-stranger').clone(true);
+               $(cloned_el).removeClass('el-chat-stranger d-none')
+            }
+            $(cloned_el).find('.person').html(sender);
+            $(cloned_el).find('.message').html(message);
+            
+            $('.chat-messages').append(cloned_el);
+
+            $("#chatMessage").animate({ scrollTop: $('#chatMessage').prop("scrollHeight")}, 1000);
+         }
+
+         function createRoom(room_id, name)
+         {
+            push(ref(db, 'rooms/'+room_id), {
+               member_name: name,
+            });
+         }
+
+         function sendMessage(room_id)
+         {
+            var text_message = $('#textMessage').val();
+            push(ref(db, 'messages/'+room_id), {
+               sender: name,
+               message: text_message,
+            });
+            $('#textMessage').val('')
+         }
+
+         function makeid(length) {
+            var result           = '';
+            var characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            var charactersLength = characters.length;
+            for ( var i = 0; i < length; i++ ) {
+               result += characters.charAt(Math.floor(Math.random() * charactersLength));
+            }
+            return result;
+         }
+      </script>
+
+      <main class="content">
+         <div class="container p-0">
+
+            <h1 class="h3 mb-3">Messages</h1>
+
+            <div class="card">
+               <div class="row g-0">
+                  <div class="col-12 col-sm-12">
+                     <div class="py-2 px-4 border-bottom d-none d-lg-block">
+                        <div class="d-flex align-items-center py-1">
+                           <div class="flex-grow-1 pl-3">
+                              <strong>R Chat</strong>
+                           </div>
+                        </div>
+                     </div>
+
+                     <div class="chat-message-right pb-4 el-chat-me d-none">
+                        <div class="flex-shrink-1 bg-light rounded py-2 px-3 mr-3">
+                           <div class="font-weight-bold mb-1 person">You</div>
+                           <span class="message"></span>
+                        </div>
+                     </div>
+
+                     <div class="chat-message-left pb-4 el-chat-stranger d-none">
+                        <div class="flex-shrink-1 bg-light rounded py-2 px-3 ml-3">
+                           <div class="font-weight-bold mb-1 person">Sharon Lessman</div>
+                           <span class="message"></span>
+                        </div>
+                     </div>
+
+                     <div class="position-relative">
+                        <div id="chatMessage" class="chat-messages p-4">
+                           
+
+                        </div>
+                     </div>
+
+                     <form id="formMessage">
+                        <div class="flex-grow-0 py-3 px-4 border-top">
+                           <div class="input-group">
+                              <input type="text" class="form-control" id="textMessage" autocomplete="off" readonly placeholder="Type your message .." value="hi ...">
+                              <button class="btn btn-success" id="kirimPesan">Connect ..</button>
+                           </div>
+                        </div>
+                     </form>
+
+                  </div>
+               </div>
+            </div>
+         </div>
+      </main>
+   </body>
+</html>
